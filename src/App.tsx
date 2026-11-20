@@ -621,7 +621,12 @@ function SetupSection() {
               ollama pull qwen2.5:7b
             </code>
           </Step>
-          <Step number={4} title="Run the Streamlit app">
+          <Step number={4} title="Run the test suite (validates all components)">
+            <code className="block bg-black/60 rounded-lg p-3 text-green-300">
+              python test_agent.py
+            </code>
+          </Step>
+          <Step number={5} title="Run the Streamlit app">
             <code className="block bg-black/60 rounded-lg p-3 text-green-300">
               streamlit run app.py
             </code>
@@ -660,6 +665,7 @@ function SetupSection() {
 ├── db.py              # Database init, schema, CRUD helpers
 ├── agent.py           # Anomaly detection, LLM call, optimizer, autonomy
 ├── app.py             # Streamlit UI (main entry point)
+├── test_agent.py      # Comprehensive test suite
 ├── requirements.txt   # Python dependencies
 └── inventory.db       # SQLite database (auto-created on first run)`}
         </pre>
