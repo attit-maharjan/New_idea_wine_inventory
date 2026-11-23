@@ -7,7 +7,7 @@ import logging
 from math import ceil
 from typing import List, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 import db
 
@@ -19,10 +19,14 @@ logger = logging.getLogger(__name__)
 
 class LLMResponse(BaseModel):
     """Structured response from the LLM."""
+    model_config = ConfigDict(populate_by_name=True)
+
     diagnosis: str = Field(description="One-sentence diagnosis of the anomaly")
     chosen_policy: str = Field(description="Either 'min_max' or 'order_up_to'")
     service_level: float = Field(ge=0.90, le=0.99, description="Target service level")
-    requires_human_approval: bool = Field(description="Whether human approval is needed")
+    requires_human_approval: bool = Field(
+        description="Whether human approval is needed", alias="requires_humanApproval"
+    )
 
 
 # ---------------------------------------------------------------------------
