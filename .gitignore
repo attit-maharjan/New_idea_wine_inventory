@@ -3,3 +3,8 @@ node_modules/
 dist/
 build/
 *.log
+__pycache__/
+*.pyc
+inventory.db
+inventory_agent/inventory.db
+inventory_agent/__pycache__/

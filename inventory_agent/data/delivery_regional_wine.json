@@ -1,0 +1,10 @@
+{
+  "supplier_id": "SUP-002",
+  "supplier_name": "Regional Wine Co",
+  "standard_days": 5,
+  "express_days": 2,
+  "delivery_days": ["tuesday", "thursday"],
+  "cutoff_time": "16:00",
+  "holiday_closures": ["2026-12-24", "2026-12-25", "2027-01-01"],
+  "notes": "Standard delivery 5 days. Deliveries Tue/Thu only."
+}

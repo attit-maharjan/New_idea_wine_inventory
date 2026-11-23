@@ -1,0 +1,10 @@
+{
+  "supplier_id": "SUP-001",
+  "supplier_name": "Vineyard Direct",
+  "standard_days": 3,
+  "express_days": 1,
+  "delivery_days": ["monday", "wednesday", "friday"],
+  "cutoff_time": "14:00",
+  "holiday_closures": ["2026-12-25", "2027-01-01"],
+  "notes": "Standard delivery 3 days. Express available +$25. Orders must be placed by 2pm."
+}

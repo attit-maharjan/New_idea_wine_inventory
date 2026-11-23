@@ -1,0 +1,12 @@
+{
+  "supplier_id": "SUP-002",
+  "supplier_name": "Regional Wine Co",
+  "products": [
+    {"sku": "SKU-001", "name": "Chardonnay", "category": "white", "unit_cost": 12.00, "min_order_qty": 12, "case_size": 12},
+    {"sku": "SKU-002", "name": "Pinot Noir", "category": "red", "unit_cost": 18.00, "min_order_qty": 12, "case_size": 12},
+    {"sku": "SKU-003", "name": "Cabernet", "category": "red", "unit_cost": 22.00, "min_order_qty": 12, "case_size": 12},
+    {"sku": "SKU-004", "name": "Sauvignon Blanc", "category": "white", "unit_cost": 10.00, "min_order_qty": 12, "case_size": 12},
+    {"sku": "SKU-005", "name": "Prosecco", "category": "sparkling", "unit_cost": 14.00, "min_order_qty": 12, "case_size": 12}
+  ],
+  "notes": "Regional distributor. Minimum order is one full case per SKU."
+}

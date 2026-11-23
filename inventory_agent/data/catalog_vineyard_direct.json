@@ -1,0 +1,12 @@
+{
+  "supplier_id": "SUP-001",
+  "supplier_name": "Vineyard Direct",
+  "products": [
+    {"sku": "SKU-001", "name": "Chardonnay", "category": "white", "unit_cost": 11.50, "min_order_qty": 6, "case_size": 12},
+    {"sku": "SKU-002", "name": "Pinot Noir", "category": "red", "unit_cost": 17.00, "min_order_qty": 6, "case_size": 12},
+    {"sku": "SKU-003", "name": "Cabernet", "category": "red", "unit_cost": 21.00, "min_order_qty": 6, "case_size": 12},
+    {"sku": "SKU-004", "name": "Sauvignon Blanc", "category": "white", "unit_cost": 9.50, "min_order_qty": 12, "case_size": 12},
+    {"sku": "SKU-005", "name": "Prosecco", "category": "sparkling", "unit_cost": 13.50, "min_order_qty": 6, "case_size": 12}
+  ],
+  "notes": "Premium estate-direct supplier. Free delivery on orders of 3+ cases."
+}

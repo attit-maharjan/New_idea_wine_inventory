@@ -1,0 +1,16 @@
+{
+  "supplier_id": "SUP-003",
+  "supplier_name": "Global Imports",
+  "prices": [
+    {"sku": "SKU-001", "unit_cost": 10.50, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-002", "unit_cost": 16.00, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-003", "unit_cost": 20.00, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-004", "unit_cost": 9.00, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-005", "unit_cost": 12.50, "currency": "USD", "effective_date": "2026-01-01"}
+  ],
+  "volume_discounts": [
+    {"min_qty": 60, "discount_pct": 7},
+    {"min_qty": 120, "discount_pct": 12}
+  ],
+  "notes": "Prices effective 2026-01-01. Import duties may apply."
+}

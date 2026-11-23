@@ -1,0 +1,17 @@
+{
+  "supplier_id": "SUP-001",
+  "supplier_name": "Vineyard Direct",
+  "prices": [
+    {"sku": "SKU-001", "unit_cost": 11.50, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-002", "unit_cost": 17.00, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-003", "unit_cost": 21.00, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-004", "unit_cost": 9.50, "currency": "USD", "effective_date": "2026-01-01"},
+    {"sku": "SKU-005", "unit_cost": 13.50, "currency": "USD", "effective_date": "2026-01-01"}
+  ],
+  "volume_discounts": [
+    {"min_qty": 24, "discount_pct": 5},
+    {"min_qty": 48, "discount_pct": 10},
+    {"min_qty": 96, "discount_pct": 15}
+  ],
+  "notes": "Prices effective 2026-01-01. Volume discounts apply per line item."
+}

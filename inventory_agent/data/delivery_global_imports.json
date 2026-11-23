@@ -1,0 +1,10 @@
+{
+  "supplier_id": "SUP-003",
+  "supplier_name": "Global Imports",
+  "standard_days": 8,
+  "express_days": 4,
+  "delivery_days": ["wednesday"],
+  "cutoff_time": "10:00",
+  "holiday_closures": ["2026-12-25", "2027-01-01"],
+  "notes": "Standard delivery 8 days. Deliveries Wednesday only. Orders by 10am Wednesday."
+}
