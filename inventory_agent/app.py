@@ -318,8 +318,9 @@ elif page == "🤖 Agent Control":
 elif page == "❓ Ask a Question":
     st.title("❓ Ask the Agent")
 
-    st.caption("Ask natural-language questions about sales, stock, suppliers, waste, "
-               "and order recommendations. Answers are grounded in database evidence.")
+    st.caption("Ask any question about sales, stock, suppliers, waste, purchases, "
+               "agent decisions, reports, or what-if analysis. The local LLM answers "
+               "from database evidence and supplier documents.")
 
     question = st.text_input(
         "Your question",

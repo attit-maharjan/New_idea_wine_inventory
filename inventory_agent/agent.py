@@ -606,153 +606,133 @@ def run_morning_report(trigger: str = "scheduled") -> Dict:
 # 10. Question-answering tools
 # ---------------------------------------------------------------------------
 
+
+def build_inventory_evidence() -> dict:
+    """Build a deterministic evidence pack with precomputed facts.
+    The LLM explains and recommends from these facts; it never calculates them.
+    """
+    wines = db.get_all_wines()
+    suppliers = db.get_all_suppliers()
+    evidence = []
+
+    for wine in wines:
+        velocity = db.get_sales_velocity(wine["sku"], days=30)
+        avg_daily = velocity["avg_daily_demand"]
+
+        if avg_daily > 0:
+            days_remaining = wine["current_stock"] / avg_daily
+        else:
+            days_remaining = None
+
+        supplier_options = compare_suppliers_for_sku(wine["sku"])
+
+        evidence.append({
+            "sku": wine["sku"],
+            "name": wine["name"],
+            "current_stock": wine["current_stock"],
+            "reorder_point": wine["reorder_point"],
+            "unit_cost": wine["unit_cost"],
+            "lead_time_days": wine["lead_time_days"],
+            "supplier_reliability": wine["supplier_reliability"],
+            "sales_last_30_days": velocity["total_quantity"],
+            "average_daily_demand": round(avg_daily, 2),
+            "estimated_days_remaining": (
+                round(days_remaining, 1)
+                if days_remaining is not None else None
+            ),
+            "supplier_options": supplier_options,
+        })
+
+    return {
+        "inventory_date": datetime.now().isoformat(),
+        "wines": evidence,
+        "open_purchases": db.get_open_purchases(),
+        "waste_events": db.get_waste_events(),
+    }
+
+
+def build_order_recommendations() -> list:
+    """Deterministic order quantity recommendations computed by Python.
+    The LLM explains and prioritizes these; it never invents quantities.
+    """
+    evidence = build_inventory_evidence()
+    recommendations = []
+
+    for wine in evidence["wines"]:
+        demand = wine["average_daily_demand"]
+        lead_time = wine["lead_time_days"]
+        stock = wine["current_stock"]
+
+        target_stock = demand * (lead_time + 7)
+        quantity = max(0, ceil(target_stock - stock))
+
+        if quantity > 0:
+            recommendations.append({
+                "sku": wine["sku"],
+                "name": wine["name"],
+                "current_stock": stock,
+                "average_daily_demand": demand,
+                "lead_time_days": lead_time,
+                "recommended_quantity": quantity,
+                "reason": (
+                    f"{stock} bottles in stock, "
+                    f"{demand} bottles sold per day, "
+                    f"{lead_time} day supplier lead time"
+                ),
+                "supplier_options": wine["supplier_options"],
+            })
+
+    return recommendations
+
+
 def answer_question(question: str) -> Dict:
     """
-    Answer a natural-language question using database and document tools.
-    Returns answer, sources, and calculations used.
+    Answer an open-ended question with the local LLM grounded in current
+    inventory, history, supplier documents, and previous Q&A.  Python
+    calculates all facts; the LLM explains, compares, and recommends.
     """
-    q_lower = question.lower()
     asked_at = datetime.now().isoformat()
-    sources = []
-    calculations = {}
+    evidence = build_inventory_evidence()
+    evidence["order_recommendations"] = build_order_recommendations()
+    sources = ["wines", "sales", "purchases", "waste_events", "order_recommendations"]
+    calculations = {"evidence_rows": len(evidence["wines"])}
+    system_prompt = """You are a restaurant inventory analyst.
 
-    # ---- "What sold yesterday?" ----
-    if "sold yesterday" in q_lower or "sales yesterday" in q_lower:
-        yesterday = (date.today() - timedelta(days=1)).isoformat()
-        sales = db.get_sales(start_date=yesterday, end_date=yesterday)
-        total_qty = sum(s["quantity"] for s in sales)
-        total_rev = sum(s["quantity"] * s["selling_price"] for s in sales)
-        by_sku = {}
-        for s in sales:
-            by_sku.setdefault(s["sku"], 0)
-            by_sku[s["sku"]] += s["quantity"]
-        answer = (
-            f"Yesterday ({yesterday}): {len(sales)} sales transactions, "
-            f"{total_qty} bottles sold, ${total_rev:.2f} revenue. "
-            f"By SKU: {', '.join(f'{k}={v}' for k, v in sorted(by_sku.items()))}"
+Use only the supplied evidence.
+
+Rules:
+1. Never invent stock, sales, reorder points, prices, lead times, or discounts.
+2. Never change a number from the evidence.
+3. Use the precomputed calculations exactly as provided.
+4. If the evidence does not contain an answer, say that it is missing.
+5. You may rank options and explain recommendations.
+6. For every recommendation, mention the SKU and the evidence supporting it.
+7. Do not claim that an order was placed. Only recommend an order.
+"""
+    user_message = (
+        "Inventory evidence:\n"
+        + json.dumps(evidence, indent=2, default=str)
+        + "\n\nUser question:\n"
+        + question
+    )
+    try:
+        import ollama
+        response = ollama.chat(
+            model="qwen2.5:7b",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
         )
-        sources = ["sales table"]
-        calculations = {
-            "total_quantity": total_qty,
-            "total_revenue": round(total_rev, 2),
-            "by_sku": by_sku,
-        }
-
-    # ---- "Which wine is most likely to run out?" ----
-    elif "run out" in q_lower or "stockout" in q_lower:
-        wines = db.get_all_wines()
-        candidates = []
-        for w in wines:
-            vel = db.get_sales_velocity(w["sku"], days=30)
-            avg_daily = vel["avg_daily_demand"]
-            if avg_daily > 0 and w["current_stock"] > 0:
-                days_remaining = w["current_stock"] / avg_daily
-                candidates.append({
-                    "sku": w["sku"],
-                    "name": w["name"],
-                    "current_stock": w["current_stock"],
-                    "avg_daily_demand": round(avg_daily, 2),
-                    "days_remaining": round(days_remaining, 1),
-                })
-        candidates.sort(key=lambda x: x["days_remaining"])
-        if candidates:
-            top = candidates[0]
-            answer = (
-                f"{top['name']} ({top['sku']}) is most likely to run out. "
-                f"Current stock: {top['current_stock']}, "
-                f"avg daily demand: {top['avg_daily_demand']}, "
-                f"estimated days remaining: {top['days_remaining']}."
-            )
-        else:
-            answer = "No wines with sufficient sales data to predict stockout."
-        sources = ["wines table", "sales table"]
-        calculations = {"candidates": candidates[:5]}
-
-    # ---- "Why did the agent recommend this order?" ----
-    elif "why" in q_lower and ("order" in q_lower or "recommend" in q_lower):
-        # Extract SKU if mentioned
+        answer = response["message"]["content"].strip()
+        calculations["llm_used"] = True
+    except Exception as exc:
+        logger.exception("General Q&A LLM call failed")
         answer = (
-            "The agent recommends orders based on: (1) current stock vs reorder point, "
-            "(2) sales velocity over the last 30 days, (3) supplier lead time and "
-            "reliability, and (4) a deterministic order-up-to formula. "
-            "Quantities are calculated by code, not the LLM. The LLM only provides "
-            "diagnosis and policy selection."
+            "The general LLM question service is unavailable. Start Ollama and pull "
+            "qwen2.5:7b, then try again. Technical detail: " + str(exc)[:160]
         )
-        sources = ["agent_decisions table", "wines table", "sales table"]
-
-    # ---- "Which supplier is cheapest for X?" ----
-    elif "cheapest" in q_lower and "supplier" in q_lower:
-        sku = None
-        for token in question.split():
-            if token.startswith("SKU-"):
-                sku = token
-                break
-        if sku:
-            comparison = compare_suppliers_for_sku(sku)
-            if comparison:
-                best = comparison[0]
-                answer = (
-                    f"For {sku}, the cheapest supplier is {best['supplier_name']} "
-                    f"at ${best['price']} per unit (lead time: "
-                    f"{best['lead_time_days']} days, reliability: {best['reliability']}/5)."
-                )
-            else:
-                answer = f"No supplier pricing found for {sku}."
-        else:
-            answer = "Please specify a SKU (e.g. 'Which supplier is cheapest for SKU-001?')"
-        sources = ["supplier_docs (price_list)", "suppliers table"]
-
-    # ---- "What changed compared with last week?" ----
-    elif "changed" in q_lower and "last week" in q_lower:
-        last_week_start = (date.today() - timedelta(days=7)).isoformat()
-        this_week_start = (date.today() - timedelta(days=14)).isoformat()
-        sales_this = db.get_sales(start_date=this_week_start, end_date=last_week_start)
-        sales_last = db.get_sales(start_date=last_week_start, end_date=yesterday.isoformat() if (yesterday := date.today() - timedelta(days=1)) else None)
-        qty_this = sum(s["quantity"] for s in sales_this)
-        qty_last = sum(s["quantity"] for s in sales_last)
-        change_pct = ((qty_this - qty_last) / qty_last * 100) if qty_last > 0 else 0
-        answer = (
-            f"This week: {qty_this} bottles sold. Last week: {qty_last} bottles sold. "
-            f"Change: {change_pct:+.1f}%."
-        )
-        sources = ["sales table"]
-        calculations = {"this_week_qty": qty_this, "last_week_qty": qty_last, "change_pct": round(change_pct, 1)}
-
-    # ---- "Which wines have unreliable suppliers?" ----
-    elif "unreliable" in q_lower:
-        wines = db.get_all_wines()
-        unreliable = [w for w in wines if w["supplier_reliability"] <= 2]
-        if unreliable:
-            names = ", ".join(f"{w['name']} ({w['sku']}, reliability {w['supplier_reliability']}/5)" for w in unreliable)
-            answer = f"Wines with unreliable suppliers (reliability <= 2): {names}."
-        else:
-            answer = "No wines have unreliable suppliers."
-        sources = ["wines table"]
-
-    # ---- "How much stock was wasted this month?" ----
-    elif "wasted" in q_lower or "waste" in q_lower:
-        month_start = date.today().replace(day=1).isoformat()
-        waste = db.get_waste_events(start_date=month_start)
-        total_waste = sum(w["quantity"] for w in waste)
-        by_sku = {}
-        for w in waste:
-            by_sku.setdefault(w["sku"], 0)
-            by_sku[w["sku"]] += w["quantity"]
-        answer = (
-            f"This month: {total_waste} bottles wasted across {len(waste)} events. "
-            f"By SKU: {', '.join(f'{k}={v}' for k, v in sorted(by_sku.items()))}"
-        )
-        sources = ["waste_events table"]
-        calculations = {"total_waste": total_waste, "by_sku": by_sku}
-
-    else:
-        answer = (
-            "I can answer questions about sales, stockouts, supplier pricing, waste, "
-            "and order recommendations. Try: 'What sold yesterday?', 'Which wine is "
-            "most likely to run out?', 'Which supplier is cheapest for SKU-001?'"
-        )
-        sources = []
-        calculations = {}
+        calculations["llm_used"] = False
 
     # Persist the Q&A
     db.insert_question(
