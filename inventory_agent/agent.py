@@ -9,6 +9,8 @@ import logging
 import json
 import os
 import copy
+import smtplib
+from email.message import EmailMessage
 from math import ceil
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Tuple
@@ -18,6 +20,89 @@ from pydantic import BaseModel, Field, ConfigDict
 import db
 
 logger = logging.getLogger(__name__)
+
+# Editable notification recipients. Change these values later, or override them
+# with MORNING_REPORT_EMAIL and SUPPLIER_ORDER_EMAIL environment variables.
+MORNING_REPORT_EMAIL = os.getenv("MORNING_REPORT_EMAIL", "im.coffeeblack@gmail.com")
+SUPPLIER_ORDER_EMAIL = os.getenv("SUPPLIER_ORDER_EMAIL", "mrhjn.attit@gmail.com")
+
+
+def send_email(to_address: str, subject: str, body: str) -> Dict:
+    """Send an email through SMTP configured by environment variables.
+
+    Required environment variables: SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+    SMTP_PASSWORD, SMTP_FROM. No email is sent when configuration is missing.
+    """
+    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM"]
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        return {"sent": False, "to": to_address, "error": "Missing SMTP settings: " + ", ".join(missing)}
+
+    message = EmailMessage()
+    message["From"] = os.environ["SMTP_FROM"]
+    message["To"] = to_address
+    message["Subject"] = subject
+    message.set_content(body)
+    try:
+        with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ["SMTP_PORT"]), timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(os.environ["SMTP_USERNAME"], os.environ["SMTP_PASSWORD"])
+            smtp.send_message(message)
+        return {"sent": True, "to": to_address, "error": None}
+    except Exception as exc:
+        logger.exception("Email delivery failed")
+        return {"sent": False, "to": to_address, "error": str(exc)}
+
+
+def format_morning_report_email(report: Dict) -> str:
+    """Create a compact plain-text morning report email."""
+    summary = report["summary"]
+    lines = [
+        f"Autonomous wine inventory morning report — {report['date']}",
+        "",
+        f"Wines monitored: {summary['wines_monitored']}",
+        f"Issues found: {summary['anomalies_found']}",
+        f"Auto-approved recommendations: {summary['orders_auto_approved']}",
+        "",
+        "Recommendations:",
+    ]
+    for issue in report["today"]["issues"]:
+        lines.append(
+            f"- {issue.get('sku')} {issue.get('name')}: "
+            f"{issue.get('order_quantity', 0)} units, ${issue.get('total_cost', 0):.2f}, "
+            f"status={issue.get('status')}"
+        )
+    return "\n".join(lines)
+
+
+def send_morning_report_email(report: Dict) -> Dict:
+    """Send the generated morning report to the configured restaurant address."""
+    return send_email(
+        MORNING_REPORT_EMAIL,
+        f"Wine inventory morning report — {report['date']}",
+        format_morning_report_email(report),
+    )
+
+
+def send_supplier_order_email(issue: Dict, supplier: Optional[Dict] = None) -> Dict:
+    """Send a recommendation notice for an approved supplier order.
+
+    This is a notification only; the current app does not place a real order.
+    """
+    supplier_name = (supplier or {}).get("supplier_name", "selected supplier")
+    body = (
+        "The inventory agent approved a supplier order recommendation.\n\n"
+        f"Wine: {issue.get('name')} ({issue.get('sku')})\n"
+        f"Quantity: {issue.get('order_quantity')}\n"
+        f"Estimated cost: ${issue.get('total_cost', 0):.2f}\n"
+        f"Supplier: {supplier_name}\n"
+        "\nThis message is a recommendation notification. No external order was placed."
+    )
+    return send_email(
+        SUPPLIER_ORDER_EMAIL,
+        f"Supplier order recommendation — {issue.get('sku')}",
+        body,
+    )
 
 # ---------------------------------------------------------------------------
 # Scenario isolation

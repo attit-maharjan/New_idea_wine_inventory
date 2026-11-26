@@ -143,7 +143,23 @@ elif page == "🌅 Morning Report":
                 report = agent.run_morning_report(trigger="manual")
                 st.session_state.morning_report = report
                 st.session_state.tokens_today = db.get_total_tokens()
+                morning_email = agent.send_morning_report_email(report)
+                supplier_emails = []
+                for issue in report["today"]["issues"]:
+                    if issue.get("status") == "auto_approved" and issue.get("order_quantity", 0) > 0:
+                        supplier_emails.append(agent.send_supplier_order_email(issue))
+                st.session_state.morning_email_result = morning_email
+                st.session_state.supplier_email_results = supplier_emails
             st.success("Morning report complete!")
+            if not morning_email["sent"]:
+                st.warning(f"Morning report email was not sent: {morning_email['error']}")
+            else:
+                st.success(f"Morning report emailed to {morning_email['to']}")
+            for result in supplier_emails:
+                if result["sent"]:
+                    st.info(f"Supplier recommendation emailed to {result['to']}")
+                else:
+                    st.warning(f"Supplier email was not sent: {result['error']}")
 
     report = st.session_state.morning_report
     if report:
@@ -480,8 +496,24 @@ elif page == "📦 Data Import":
 elif page == "🏭 Supplier Documents":
     st.title("🏭 Supplier Documents")
 
-    st.caption("Read-only supplier catalogs, price lists, and delivery schedules. "
-               "The agent consults these before making order recommendations.")
+    st.caption("Edit supplier names, reliability, prices, minimum orders, and delivery "
+               "times here. The agent uses the saved values for comparisons and recommendations.")
+
+    st.subheader("Supplier master data")
+    suppliers = db.get_all_suppliers()
+    for supplier in suppliers:
+        with st.expander(f"{supplier['supplier_id']} — {supplier['name']}", expanded=False):
+            with st.form(f"supplier_form_{supplier['supplier_id']}"):
+                name = st.text_input("Name", value=supplier["name"])
+                website = st.text_input("Website", value=supplier["website"])
+                reliability = st.number_input(
+                    "Reliability (1–5)", min_value=1, max_value=5,
+                    value=int(supplier["reliability"]), step=1,
+                )
+                if st.form_submit_button("Save supplier"):
+                    db.update_supplier(supplier["supplier_id"], name, website, reliability)
+                    st.success("Supplier saved. Future comparisons will use this value.")
+                    st.rerun()
 
     docs = db.get_supplier_docs()
     if docs:
@@ -499,6 +531,23 @@ elif page == "🏭 Supplier Documents":
         selected = next(d for d in docs if d["id"] == doc_id)
         content = json.loads(selected["content_json"])
         st.json(content)
+        with st.expander("Edit document JSON"):
+            edited_json = st.text_area(
+                "JSON content",
+                value=json.dumps(content, indent=2),
+                height=320,
+                key=f"edit_doc_{selected['id']}",
+            )
+            if st.button("Save document", key=f"save_doc_{selected['id']}"):
+                try:
+                    updated_content = json.loads(edited_json)
+                    db.update_supplier_doc(
+                        selected["supplier_id"], selected["doc_type"], updated_content
+                    )
+                    st.success("Supplier document saved. Agent tools will use the new data.")
+                    st.rerun()
+                except json.JSONDecodeError as exc:
+                    st.error(f"Invalid JSON: {exc}")
     else:
         st.info("No supplier documents found. Run seed_data.py to populate.")
 

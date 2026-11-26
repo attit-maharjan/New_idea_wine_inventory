@@ -544,6 +544,18 @@ def get_supplier_by_id(supplier_id: str) -> Optional[Dict]:
     return dict(row) if row else None
 
 
+def update_supplier(supplier_id: str, name: str, website: str,
+                    reliability: int) -> None:
+    """Update editable supplier master data."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE suppliers SET name = ?, website = ?, reliability = ? WHERE supplier_id = ?",
+        (name.strip(), website.strip(), int(reliability), supplier_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 # ---------------------------------------------------------------------------
 # NEW: Supplier document helpers (read-only catalog)
 # ---------------------------------------------------------------------------
@@ -582,6 +594,18 @@ def get_supplier_doc_content(supplier_id: str, doc_type: str) -> Optional[Dict]:
         import json
         return json.loads(row["content_json"])
     return None
+
+
+def update_supplier_doc(supplier_id: str, doc_type: str, content: Dict) -> None:
+    """Update the JSON content of an editable supplier document."""
+    import json
+    conn = get_connection()
+    conn.execute(
+        "UPDATE supplier_docs SET content_json = ? WHERE supplier_id = ? AND doc_type = ?",
+        (json.dumps(content), supplier_id, doc_type),
+    )
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------------------------------------------------------
